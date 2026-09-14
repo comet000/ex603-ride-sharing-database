@@ -62,7 +62,7 @@ If a driver has earned badges, those award records should stay even if the drive
 
 A badge shouldn’t be deletable while any awards still point to it. This keeps the history of who earned what intact.
 
-I used RESTRICT on all four foreign keys on purpose. The consistent rule is that historical records (trips and awards) are protected. In practice this means hard-deletes of riders or drivers almost never happen once they have activity — the is_active flag is the proper way to “remove” someone instead.
+I used RESTRICT on all four foreign keys on purpose. The consistent rule is that historical records (trips and awards) are protected. In practice this means hard-deletes of riders or drivers almost never happen once they have activity. The is_active flag is the proper way to “remove” someone instead.
 
 ## Summary
 
