@@ -1,0 +1,36 @@
+erDiagram
+    riders ||--o{ trips : has
+    drivers ||--o{ trips : drives
+    drivers ||--o{ driver_badge_awards : earns
+    driver_badges ||--o{ driver_badge_awards : defines
+
+    riders {
+        BIGINT rider_id PK
+        VARCHAR display_name
+    }
+
+    drivers {
+        BIGINT driver_id PK
+        VARCHAR display_name
+        BOOLEAN is_active
+        NUMERIC rating
+    }
+
+    trips {
+        BIGINT trip_id PK
+        BIGINT rider_id FK
+        BIGINT driver_id FK
+        TIMESTAMPTZ trip_timestamp
+        NUMERIC fare_amount
+    }
+
+    driver_badges {
+        BIGINT badge_id PK
+        VARCHAR name
+    }
+
+    driver_badge_awards {
+        BIGINT driver_id PK, FK
+        BIGINT badge_id PK, FK
+        TIMESTAMPTZ awarded_at
+    }
