@@ -1,36 +1,44 @@
 erDiagram
-    riders ||--o{ trips : has
-    drivers ||--o{ trips : drives
+    riders ||--o{ trips : requests
+    drivers ||--o{ trips : accepts
     drivers ||--o{ driver_badge_awards : earns
-    driver_badges ||--o{ driver_badge_awards : defines
+    driver_badges ||--o{ driver_badge_awards : "is awarded in"
 
     riders {
-        BIGINT rider_id PK
+        INTEGER rider_id PK
         VARCHAR display_name
+        VARCHAR email UK
+        VARCHAR phone_number
+        DATE joined_date
     }
-
     drivers {
-        BIGINT driver_id PK
+        INTEGER driver_id PK
         VARCHAR display_name
+        VARCHAR email UK
+        VARCHAR phone_number
+        VARCHAR license_number UK
+        DATE joined_date
         BOOLEAN is_active
-        NUMERIC rating
+        NUMERIC rating "optional, 0-5, stored average"
     }
-
     trips {
-        BIGINT trip_id PK
-        BIGINT rider_id FK
-        BIGINT driver_id FK
-        TIMESTAMPTZ trip_timestamp
+        INTEGER trip_id PK
+        INTEGER rider_id FK
+        INTEGER driver_id FK
+        TIMESTAMP trip_time_requested
+        TIMESTAMP trip_time_start
+        TIMESTAMP trip_time_end "must be >= start"
+        NUMERIC trip_distance_miles "actual, set at completion"
         NUMERIC fare_amount
+        NUMERIC tip_amount
+        NUMERIC trip_rating "optional, 0-5"
     }
-
     driver_badges {
-        BIGINT badge_id PK
-        VARCHAR name
+        INTEGER badge_id PK
+        VARCHAR name UK
     }
-
     driver_badge_awards {
-        BIGINT driver_id PK, FK
-        BIGINT badge_id PK, FK
-        TIMESTAMPTZ awarded_at
+        INTEGER driver_id PK, FK
+        INTEGER badge_id PK, FK
+        TIMESTAMP awarded_at
     }
