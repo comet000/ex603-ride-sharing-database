@@ -126,11 +126,11 @@ The Unit 3 leadership-facing audit is in [`analysis/unit3-finding.md`](analysis/
 
 | Query | Business question |
 |---|---|
-| Part A — Required | How many trips and rider no-shows did each driver have, side by side? |
+| Part A — Required | Among drivers with recorded trips, how many trips and rider no-shows did each have, side by side? |
 | Part B1 — **Primary ROLLUP** | What are the pickup-region subtotals and platform grand total, without detailed city rows? |
 | Part B2 — Supplementary ROLLUP | Which pickup cities have higher or lower no-show rates than the entire platform? |
-| Part C — Required | Among busier drivers, what share of trips were no-shows, and who is above that group's rate? |
+| Part C — Required | Among drivers with more trips than the average driver with trips, what is the group's no-show rate, and whose rate is higher? |
 | D1 — Exploratory | Which riders had more than one no-show, and were different drivers involved? |
 | D2 — Exploratory | How do recorded no-show rates vary by surge multiplier? |
 
-For the written discussion of the aggregate results, geographic choices, threshold and reflection, see [`analysis/unit4.md`](analysis/unit4.md). The leadership brief is [`analysis/unit4-finding.md`](analysis/unit4-finding.md). Query-and-result screenshots are in [`screenshots/`](screenshots/), named to match the query each one shows. The regional subtotal and grand-total rows are explicitly labeled in the Part B1 output.
+For the expanded discussion of fare averages, the volume threshold, geographic and driver comparisons, additional rider and surge checks, and the reflection, see [`analysis/unit4.md`](analysis/unit4.md). The leadership report and recommended follow-up investigations are in [`analysis/unit4-finding.md`](analysis/unit4-finding.md). Query-and-result screenshots are in [`screenshots/`](screenshots/), named to match the query each one shows. The regional subtotal and grand-total rows are explicitly labeled in the Part B1 output.
