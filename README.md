@@ -46,3 +46,91 @@ psql -d ridesharing -c "\dt"
 ```
 
 The script starts with a reset block, so you can run it again on the same database without cleaning anything up first.
+
+## Course query catalogue — Units 3 and 4
+
+The schema and setup instructions above describe my **Unit 2 database**. For Units **3 and 4**, the course supplied a separate ride-sharing dataset, [`rideshare.sql`](rideshare.sql), used in the `ex603_data` PostgreSQL database. Its tables and fields are not necessarily the same as my Unit 2 design. For the course dataset, the failure being audited is **a rider no-show**, recorded as `cancellation_reason = 'Rider no show'`.
+
+To load the course dataset into a new database, from the folder containing `rideshare.sql`:
+
+```bash
+createdb ex603_data
+psql -d ex603_data -f rideshare.sql
+psql -d ex603_data -c "SELECT COUNT(*) FROM trips;"
+```
+
+The final check should return **200 trips**. The dataset script drops and recreates its tables on each run, so don't reload it into a database containing work you need to keep. The Unit 4 files contain read-only `SELECT` queries; run them against this course dataset, not the Unit 2 schema. Some Unit 3 files deliberately demonstrate a **broken** query before showing its repair, so those examples are not intended to execute successfully as a single uninterrupted script.
+
+### Unit 3 — Interrogating the Data
+
+**[`queries/unit3/q3_1.sql`](queries/unit3/q3_1.sql) — Explore what the data contains**
+
+| Query | Business question |
+|---|---|
+| Setup check | Did the course dataset load with the expected number of records in each table? |
+| 3.1a | Which active drivers have a rating of at least 4.5? |
+| 3.1b-1 | Which trip statuses exist in the data? |
+| 3.1b-2 | Which cancellation reasons appear under each trip status? |
+| 3.1c-1 | Which trips have fares of $5 or less? |
+| 3.1c-2 | Which trips were cancelled or disputed rather than completed? |
+| 3.1d-1 | Which drivers' recorded names end in the digit 1? |
+| 3.1d-2 | Which trips have no cancellation reason on file? |
+| 3.1d-3 | Were any cancelled trips recorded without a cancellation reason? |
+| 3.1e-1 | What percentage of trips were completed, cancelled, or disputed? |
+| 3.1e-2 | What percentage of all trips were rider no-shows? |
+
+**[`queries/unit3/q3_2.sql`](queries/unit3/q3_2.sql) — Identify and repair the dashboard errors**
+
+| Query | Business question |
+|---|---|
+| 3.2A-1 | How can a seemingly sensible cancellation filter silently omit trips? *(Intentional logic bug.)* |
+| 3.2A-2 | How many trips did that filter silently omit? |
+| 3.2A-3 | How do the excluded, included and NULL-reason counts reconcile to the platform total? |
+| 3.2A-4 | How can an explicit NULL check repair the incorrect count? |
+| 3.2A-5 | Can `COALESCE` produce the same correct count? |
+| 3.2B-1 | What happens when a filter refers to an output label before SQL has created it? *(Intentional SQL error.)* |
+| 3.2B-2 | How can repeating an expression fix the label problem? |
+| 3.2B-3 | How can a CTE fix the same problem? |
+
+**[`queries/unit3/q3_3.sql`](queries/unit3/q3_3.sql) — Verify equivalent answers**
+
+| Query | Business question |
+|---|---|
+| 3.3a | Which drivers had rider no-shows, and how many? *(Subquery with `IN`.)* |
+| 3.3b | Can the same driver/no-show answer be obtained with a CTE? |
+| 3.3c | Can the answer also be obtained using `EXISTS`? |
+| 3.3d | Do the three approaches return the same driver records and no-show counts? |
+| 3.3e | Under what NULL-related condition can a negative membership check give a different result? |
+
+The Unit 3 leadership-facing audit is in [`analysis/unit3-finding.md`](analysis/unit3-finding.md).
+
+### Unit 4 — From Rows to Insight
+
+**[`queries/unit4/q4_1.sql`](queries/unit4/q4_1.sql) — Measure the platform**
+
+| Query | Business question |
+|---|---|
+| 1a — Required | Across all trips, what are the fare count, total, average, minimum, maximum and number of distinct riders? |
+| 1b — Supplementary | How do those numbers change when $0 fares are excluded? |
+| 1c — Supplementary | Which trip outcomes account for the zero-fare records? |
+| 2a — Required | Which drivers handled the most trips, and what were their average recorded fares? |
+| 2b — Supplementary | How do drivers' positive-fare trip counts and averages compare? |
+| 3 — Required | Which drivers meet a trip-volume cutoff for comparing no-show rates? |
+| 4a — **Primary regional view** | How do trips, fares and no-show rates vary by driver and **pickup region**? |
+| 4b — Supplementary | How do the same measures vary by driver and **pickup city**? |
+| 4c — Alternative responsibility view | How would these drivers' records be grouped by **home region**? |
+| 4d — Alternative responsibility view | How would these drivers' records be grouped by **home city**? |
+| 4e — Supplementary verification | How often do pickup and driver-home locations match by city or region? |
+
+**[`queries/unit4/q4_2.sql`](queries/unit4/q4_2.sql) — Build the leadership breakdown**
+
+| Query | Business question |
+|---|---|
+| Part A — Required | How many trips and rider no-shows did each driver have, side by side? |
+| Part B1 — **Primary ROLLUP** | What are the pickup-region subtotals and platform grand total, without detailed city rows? |
+| Part B2 — Supplementary ROLLUP | Which pickup cities have higher or lower no-show rates than the entire platform? |
+| Part C — Required | Among busier drivers, what share of trips were no-shows, and who is above that group's rate? |
+| D1 — Exploratory | Which riders had more than one no-show, and were different drivers involved? |
+| D2 — Exploratory | How do recorded no-show rates vary by surge multiplier? |
+
+For the written discussion of the aggregate results, geographic choices, threshold and reflection, see [`analysis/unit4.md`](analysis/unit4.md). The leadership brief is [`analysis/unit4-finding.md`](analysis/unit4-finding.md). Query-and-result screenshots are in [`screenshots/`](screenshots/), named to match the query each one shows. The regional subtotal and grand-total rows are explicitly labeled in the Part B1 output.
