@@ -2,18 +2,23 @@
 -- Task 5.2 | Find Records That Joins May Exclude
 -- Theme: Ride Sharing   Database: ex603_data   Source: rideshare.sql
 -- Failure = cancellation_reason = 'Rider no show' (Assignments 3 and 4).
--- An event is a recorded trip, including a cancelled trip.
+-- An event is any recorded trip, including a cancelled trip.
+-- A producer with no events is a driver with no row in trips.
 -- ============================================================================
 
--- Part A | Compare INNER JOIN and LEFT JOIN
 
--- 5.2 A1 | Question: How many trips does each driver have, including zero?
--- Findings: All 15 drivers appear. Drivers 14 and 15 each have zero trips.
--- Notes: COUNT(t.trip_id), not COUNT(*), returns zero for unmatched drivers.
---        The ungrouped LEFT JOIN has 202 rows: 200 trips plus 2 driver-only
---        rows. GROUP BY produces one report row per driver.
--- Requirement: "Use LEFT JOIN to return all producers, including those who
---               have never had an event."
+-- Part A: Compare INNER JOIN and LEFT JOIN
+
+-- A1: How many trips does each driver have, including drivers who have never had one?
+--
+--    Findings: All 15 drivers appear. Drivers 14 and 15 have trip_count 0.
+--
+--    Requirement: Use LEFT JOIN to return all producers, including those who have never had an
+--    event.
+--
+--    Notes: LEFT JOIN keeps a driver even with no matching trip. COUNT(t.trip_id) counts non-NULL
+--    trip ids, so an unmatched driver contributes 0. COUNT(*) would wrongly count 1.
+--
 SELECT
     d.driver_id,
     d.driver_name,
@@ -24,10 +29,14 @@ GROUP BY d.driver_id, d.driver_name
 ORDER BY d.driver_id;
 
 
--- 5.2 A2 | Question: Which drivers have at least one trip, and how many?
--- Findings: Only 13 drivers appear. Drivers 14 and 15 are excluded;
---           the other drivers have the same trip counts as in A1.
--- Requirement: "Write an equivalent query using INNER JOIN."
+-- A2: Which drivers have at least one trip, and how many?
+--
+--    Findings: 13 drivers. Drivers 14 and 15 are absent; everyone else matches their A1 count.
+--
+--    Requirement: Write an equivalent query using INNER JOIN.
+--
+--    Notes: Same SELECT and grouping as A1; only the join keyword changes.
+--
 SELECT
     d.driver_id,
     d.driver_name,
@@ -38,12 +47,16 @@ GROUP BY d.driver_id, d.driver_name
 ORDER BY d.driver_id;
 
 
--- 5.2 A3 | Question: How many distinct drivers does INNER JOIN exclude?
--- Findings: LEFT JOIN: 15 drivers; INNER JOIN: 13; excluded: 2.
--- Notes: COUNT(DISTINCT d.driver_id) prevents multiple trips from counting
---        the same driver more than once.
--- Requirement: "Compare the results and determine how many producers are
---               excluded by the inner join."
+-- A3: How many distinct drivers does the INNER JOIN drop?
+--
+--    Findings: LEFT JOIN 15, INNER JOIN 13, excluded 2.
+--
+--    Requirement: Compare the results and determine how many producers are excluded by the inner
+--    join.
+--
+--    Notes: COUNT(DISTINCT d.driver_id) counts producers, not trips, per the assignment hint. Each
+--    subquery returns one row, so the CROSS JOIN here just lines the two counts up side by side.
+--
 SELECT
     l.driver_count AS drivers_in_left_join,
     i.driver_count AS drivers_in_inner_join,
@@ -60,15 +73,18 @@ CROSS JOIN (
 ) AS i;
 
 
--- 5.2 A4 | Question: Which drivers are missing from INNER JOIN, and why?
--- Findings: Driver 14: Saigon; onboarded 2022-04-11; rating 3.63.
---           Driver 15: Hue; onboarded 2022-11-18; rating 4.00.
---           Both are marked active and have no trips in this dataset,
---           which covers 2023. Their ratings' source and timing are unknown.
--- Notes: The INNER JOIN excludes them because they have no matching trip,
---        not because their current activity flag is false. Their lack of
---        recorded trips does not establish why they have no activity.
--- Requirement: "Explain which producers are missing and why."
+-- A4: Which drivers does the INNER JOIN omit, and why?
+--
+--    Findings: Driver 14 (Saigon, onboarded 2022-04-11, rating 3.63, active) and driver 15 (Hue,
+--    onboarded 2022-11-18, rating 4.00, active). Both have no trip in this table. The join drops
+--    them for lack of a matching trip, not because is_active is false.
+--
+--    Requirement: Explain which producers are missing and why.
+--
+--    Notes: The LEFT JOIN anti-join form: keep every driver, then WHERE t.trip_id IS NULL. That
+--    test has to be in WHERE, not ON, or every driver would come back with a NULL trip side. Part C
+--    answers the same question with NOT EXISTS and EXCEPT.
+--
 SELECT
     d.driver_id,
     d.driver_name,
@@ -82,12 +98,18 @@ WHERE t.trip_id IS NULL
 ORDER BY d.driver_id;
 
 
--- Part B | Explore RIGHT JOIN and FULL OUTER JOIN
+-- Part B: Explore RIGHT JOIN and FULL OUTER JOIN
 
--- 5.2 B1 | Question: Does RIGHT JOIN return the same driver counts as A1?
--- Findings: All 15 drivers appear, including 14 and 15 with zero trips.
--- Requirement: "Write a RIGHT JOIN that returns the same records as your
---               LEFT JOIN from Part A."
+-- B1: Does a RIGHT JOIN return the same driver records and trip counts as the LEFT JOIN in A1?
+--
+--    Findings: The RIGHT JOIN returns the same drivers and trip counts as A1, including drivers 14
+--    and 15 with zero trips.
+--
+--    Requirement: Write a RIGHT JOIN that returns the same records as your LEFT JOIN from Part A.
+--
+--    Notes: Placing drivers on the right preserves every driver, just as A1 does with drivers on the
+--    left.
+--
 SELECT
     d.driver_id,
     d.driver_name,
@@ -98,12 +120,15 @@ GROUP BY d.driver_id, d.driver_name
 ORDER BY d.driver_id;
 
 
--- 5.2 B2 | Question: Are the entire LEFT and RIGHT JOIN reports identical?
--- Findings: Both contain 15 rows. No rows differ in either direction.
--- Notes: EXCEPT compares driver_id, driver_name, AND trip_count, not just
---        the number of rows. IDs are unique in each grouped result, so a
---        two-way empty difference establishes equality of these reports.
--- Requirement: "Compare the results to confirm that they match."
+-- B2: Do the LEFT JOIN and RIGHT JOIN results match exactly?
+--
+--    Findings: Both queries return identical driver IDs, names, and trip counts. EXCEPT finds no
+--    differences in either direction.
+--
+--    Requirement: Compare the results to confirm that they match.
+--
+--    Notes: Matching row counts alone would not prove that the records are identical.
+--
 WITH left_results AS (
     SELECT
         d.driver_id,
@@ -123,14 +148,14 @@ right_results AS (
     GROUP BY d.driver_id, d.driver_name
 ),
 left_only AS (
-    SELECT * FROM left_results
+    SELECT driver_id, driver_name, trip_count FROM left_results
     EXCEPT
-    SELECT * FROM right_results
+    SELECT driver_id, driver_name, trip_count FROM right_results
 ),
 right_only AS (
-    SELECT * FROM right_results
+    SELECT driver_id, driver_name, trip_count FROM right_results
     EXCEPT
-    SELECT * FROM left_results
+    SELECT driver_id, driver_name, trip_count FROM left_results
 )
 SELECT
     (SELECT COUNT(*) FROM left_results) AS left_rows,
@@ -139,13 +164,18 @@ SELECT
     (SELECT COUNT(*) FROM right_only) AS right_only_rows;
 
 
--- 5.2 B3 | Question: Which driver-trip records match, and which do not?
--- Findings: 202 rows: 200 matches, 2 unmatched drivers (14 and 15),
---           and no trips without a driver record.
--- Notes: Unmatched records sort first to make them visible in screenshots.
---        The trips.driver_id foreign key prevents orphaned driver IDs.
--- Requirement: "Write a FULL OUTER JOIN that includes matching and
---               unmatched records from both tables."
+-- B3: Which driver and trip rows match, and which side has rows the other side does not?
+--
+--    Findings: 202 rows: 200 matched, drivers 14 and 15 as 'Driver without trip', 0 rows 'Trip
+--    without driver record'.
+--
+--    Requirement: Write a FULL OUTER JOIN that includes matching and unmatched records from both
+--    tables.
+--
+--    Notes: FULL OUTER JOIN keeps unmatched rows from both tables in one result; COALESCE takes the
+--    driver id from whichever side has it. Unmatched rows sort first so they're visible without
+--    scrolling past the 200 matches.
+--
 SELECT
     COALESCE(d.driver_id, t.driver_id) AS driver_id,
     d.driver_name,
@@ -166,38 +196,45 @@ ORDER BY
     t.trip_id;
 
 
--- 5.2 B4 | Question: What does FULL OUTER JOIN reveal from both sides?
--- Findings: 200 matched driver-trip rows, 2 driver-only rows, 0 trip-only
---           rows: 202 total. The zero trip-only count is expected because
---           the trips.driver_id foreign key requires a matching driver.
--- Notes: A LEFT JOIN with drivers first retains all drivers, while the
---        corresponding RIGHT JOIN with drivers first retains all trips.
---        FULL OUTER JOIN retains unmatched rows from BOTH tables at once.
--- Requirement: "Explain what a full outer join can reveal that a left join
---               or right join alone may not show."
+-- B4: What can a full outer join show that one outer join cannot show by itself?
+--
+--    Findings: 200 matched, 2 drivers without trips, 0 trips without a driver, 202 total.
+--
+--    Requirement: Explain what a full outer join can reveal that a left join or right join alone
+--    may not show.
+--
+--    Notes: A left join from drivers can't surface an orphan trip; a right join (drivers RIGHT JOIN
+--    trips) can't surface a driver with no trip. A full outer join shows both directions at once.
+--    The 0 on the trip side matches the foreign key (trips.driver_id is NOT NULL and references
+--    drivers). It's where a broken load would show up.
+--
 SELECT
-    COUNT(*) FILTER (
-        WHERE d.driver_id IS NOT NULL AND t.trip_id IS NOT NULL
-    ) AS matched_rows,
-    COUNT(*) FILTER (
-        WHERE d.driver_id IS NOT NULL AND t.trip_id IS NULL
-    ) AS drivers_without_trips,
-    COUNT(*) FILTER (
-        WHERE d.driver_id IS NULL AND t.trip_id IS NOT NULL
-    ) AS trips_without_driver,
+    COUNT(CASE
+        WHEN d.driver_id IS NOT NULL AND t.trip_id IS NOT NULL THEN 1
+    END) AS matched_rows,
+    COUNT(CASE
+        WHEN d.driver_id IS NOT NULL AND t.trip_id IS NULL THEN 1
+    END) AS drivers_without_trips,
+    COUNT(CASE
+        WHEN d.driver_id IS NULL AND t.trip_id IS NOT NULL THEN 1
+    END) AS trips_without_driver,
     COUNT(*) AS total_rows
 FROM drivers d
     FULL OUTER JOIN trips t ON d.driver_id = t.driver_id;
 
 
--- Part C | Find Producers with No Events Using Two Approaches
+-- Part C: Find producers with no events, two ways
 
--- 5.2 C1 | Question: Which drivers have never had a recorded trip?
--- Findings: Drivers 14 and 15.
--- Notes: NOT EXISTS tests each driver for the absence of a matching trip
---        and can return the driver's name alongside the ID.
--- Requirement: "Write two queries that identify producers who have never
---               had an event and compare them." Approach: "NOT EXISTS."
+-- C1: Which drivers have never had a recorded trip? (NOT EXISTS)
+--
+--    Findings: Drivers 14 and 15, same as A4.
+--
+--    Requirement: Write two queries that identify producers who have never had an event and compare
+--    them. Approach: NOT EXISTS.
+--
+--    Notes: Correlated anti-join: the outer row stays when the inner query returns nothing.
+--    SELECT 1 is enough; the subquery is only a test, not a source of columns.
+--
 SELECT
     d.driver_id,
     d.driver_name
@@ -210,12 +247,16 @@ WHERE NOT EXISTS (
 ORDER BY d.driver_id;
 
 
--- 5.2 C2 | Question: Which drivers have no trips, using set subtraction?
--- Findings: Drivers 14 and 15, matching C1.
--- Notes: EXCEPT subtracts trip driver IDs from all driver IDs and removes
---        duplicates. Joining to drivers adds the names for readability.
--- Requirement: "Write two queries that identify producers who have never
---               had an event and compare them." Approach: "EXCEPT."
+-- C2: Which drivers have no trips, using set difference? (EXCEPT)
+--
+--    Findings: Drivers 14 and 15, same ids as C1.
+--
+--    Requirement: Write two queries that identify producers who have never had an event and compare
+--    them. Approach: EXCEPT.
+--
+--    Notes: EXCEPT subtracts the driver ids in trips from the driver ids in drivers; the join back
+--    to drivers is only there to show the name.
+--
 SELECT
     d.driver_id,
     d.driver_name
@@ -228,15 +269,17 @@ FROM drivers d
 ORDER BY d.driver_id;
 
 
--- 5.2 C3 | Question: Do NOT EXISTS and EXCEPT identify exactly the same IDs?
--- Findings: Both return 2 drivers; neither result contains an ID missing
---           from the other. NOT EXISTS checks for matching rows, whereas
---           EXCEPT computes the difference between two sets of IDs.
--- Notes: Checking both set differences verifies exact ID equality, not
---        just equal counts.
--- Requirement: "Run both queries and compare their results. In one or two
---               sentences, explain how the approaches differ and confirm
---               whether they identify the same producers."
+-- C3: Do NOT EXISTS and EXCEPT return the same driver ids?
+--
+--    Findings: Both return 2 ids, drivers 14 and 15. Neither result has an id the other lacks.
+--
+--    Requirement: Run both queries and compare their results. In one or two sentences, explain how
+--    the approaches differ and confirm whether they identify the same producers.
+--
+--    Notes: NOT EXISTS tests row by row that no matching trip exists; EXCEPT subtracts one set of
+--    ids from another. They can differ when the compared column is nullable. driver_id is NOT
+--    NULL here, so that difference doesn't arise and both agree.
+--
 WITH not_exists_results AS (
     SELECT d.driver_id
     FROM drivers d
@@ -266,3 +309,26 @@ SELECT
     (SELECT COUNT(*) FROM except_results) AS except_count,
     (SELECT COUNT(*) FROM not_exists_only) AS only_in_not_exists,
     (SELECT COUNT(*) FROM except_only) AS only_in_except;
+
+
+-- D1 (supplemental): Which drivers have an account status that on the surface disagrees with their trip history?
+--
+--    Findings: 4 drivers. 14 and 15 are active with 0 trips. 3 and 9 are inactive with 13 and 14
+--    trips. Driver 3's latest request, 2023-12-28 02:28, is the latest in the whole trips table.
+--
+--    Notes: Not a required join type. The active flag is not why the inner join drops 14 and 15 --
+--    both are marked active. The flag also has no "as of" date, so an inactive driver with trips may
+--    simply have stopped afterward; that's a record to confirm, not something this query disproves.
+--
+SELECT
+    d.driver_id,
+    d.driver_name,
+    d.is_active,
+    COUNT(t.trip_id) AS trip_count,
+    MAX(t.requested_at) AS last_requested_at
+FROM drivers d
+    LEFT JOIN trips t ON t.driver_id = d.driver_id
+GROUP BY d.driver_id, d.driver_name, d.is_active
+HAVING (d.is_active = FALSE AND COUNT(t.trip_id) > 0)
+    OR (d.is_active = TRUE AND COUNT(t.trip_id) = 0)
+ORDER BY d.driver_id;
