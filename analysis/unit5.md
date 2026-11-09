@@ -60,32 +60,82 @@ It would be a mistake if I accidentally used a CROSS JOIN when I meant to connec
 
 ### 2. Which join algorithms did PostgreSQL choose for the three-table query?
 
-**[Add from the EXPLAIN output for the final `q5_1.sql` Q1 query.]** The repository material I have does not include the execution plan for the final version of that SELECT, so I can't reliably name the chosen algorithms yet. Record each join node shown in the actual output (for example, **Hash Join**, **Nested Loop**, or **Merge Join**) and any **Sort** node. An older plan for a shorter SELECT isn't enough to verify what PostgreSQL selected for this one.
+PostgreSQL used a **Hash Join** to connect trips to riders and then a **Nested Loop** to connect those results to drivers. The Nested Loop uses **Memoize** to remember driver lookups and an **Index Scan on `drivers_pkey`** to find drivers it hasn't already cached. A **Sort** puts the results in requested-time and trip-ID order. There's no Merge Join in the plan.
+
+Running `EXPLAIN ANALYZE` confirmed both joins produced **200 rows**, exactly as the planner expected. The interesting part is Memoize: it had **187 cache hits and 13 misses** over 200 lookups, so PostgreSQL only searched the driver index **13 times**.
 
 ### 3. What in the execution plan helps explain those choices?
 
-The first things I'd look at are the estimated **row counts**, **costs**, and whether PostgreSQL uses a **Seq Scan**, **Index Scan**, or **Sort**. The tables are small right now: **200 trips, 30 riders, and 15 drivers**. The supplied dataset has primary-key indexes for the rider and driver IDs, but no separate indexes on `trips.rider_id`, `trips.driver_id`, or `trips.requested_at`. A Hash Join can make sense for small tables joined on matching IDs, while a Nested Loop can make sense if the inner lookup uses an index. The `ORDER BY` can also require sorting. Those are explanations to check against the plan, not claims about nodes I haven't seen.
+PostgreSQL reads the whole `trips` table with a **Seq Scan** (200 actual rows) and scans `riders` to build a small hash table. It estimated **100 riders**, but the actual scan found **30**. The hash was only **10kB**, so hashing that small table and matching it to all 200 trips makes sense for this report.
 
-**[After running EXPLAIN, add one specific sentence naming the actual scan/index and sort nodes, with their estimated rows or costs. Also paste the complete plan below or reference its screenshot.]**
+For drivers, the plan uses the `drivers_pkey` index inside a Nested Loop. We have **15 registered drivers**, but only **13** occur in the trip history. The **13 Memoize misses and 13 index searches** line up with those 13 distinct drivers; the other 187 lookups were cache hits. The cache itself used **2kB** and had no evictions. We don't have separate indexes on `trips.rider_id`, `trips.driver_id`, or `trips.requested_at` in the supplied dataset.
 
-#### Full PostgreSQL execution plan
+At the top, the Sort uses **quicksort and 46kB of memory** for the 200-row result. That means the sort stayed in memory in this run. PostgreSQL reported **0.351 ms planning time** and **6.872 ms execution time**. That's useful as one measurement, but not a reliable speed benchmark by itself.
+
+#### Full PostgreSQL EXPLAIN plan
 
 ```text
-[Paste the complete output from EXPLAIN on Task 5.1 Q1 here.]
+Sort  (cost=36.48..36.98 rows=200 width=613)
+  Sort Key: t.requested_at, t.trip_id
+  ->  Nested Loop  (cost=12.40..28.84 rows=200 width=613)
+        ->  Hash Join  (cost=12.25..17.80 rows=200 width=314)
+              Hash Cond: (t.rider_id = r.rider_id)
+              ->  Seq Scan on trips t  (cost=0.00..5.00 rows=200 width=56)
+              ->  Hash  (cost=11.00..11.00 rows=100 width=262)
+                    ->  Seq Scan on riders r  (cost=0.00..11.00 rows=100 width=262)
+        ->  Memoize  (cost=0.15..0.41 rows=1 width=262)
+              Cache Key: t.driver_id
+              Cache Mode: logical
+              ->  Index Scan using drivers_pkey on drivers d  (cost=0.14..0.40 rows=1 width=262)
+                    Index Cond: (driver_id = t.driver_id)
+```
+
+#### Full PostgreSQL EXPLAIN ANALYZE plan
+
+```text
+Sort  (cost=36.48..36.98 rows=200 width=613) (actual time=6.816..6.824 rows=200.00 loops=1)
+  Sort Key: t.requested_at, t.trip_id
+  Sort Method: quicksort  Memory: 46kB
+  Buffers: shared hit=33
+  ->  Nested Loop  (cost=12.40..28.84 rows=200 width=613) (actual time=6.166..6.651 rows=200.00 loops=1)
+        Buffers: shared hit=30
+        ->  Hash Join  (cost=12.25..17.80 rows=200 width=314) (actual time=0.080..0.236 rows=200.00 loops=1)
+              Hash Cond: (t.rider_id = r.rider_id)
+              Buffers: shared hit=4
+              ->  Seq Scan on trips t  (cost=0.00..5.00 rows=200 width=56) (actual time=0.036..0.087 rows=200.00 loops=1)
+                    Buffers: shared hit=3
+              ->  Hash  (cost=11.00..11.00 rows=100 width=262) (actual time=0.033..0.034 rows=30.00 loops=1)
+                    Buckets: 1024  Batches: 1  Memory Usage: 10kB
+                    Buffers: shared hit=1
+                    ->  Seq Scan on riders r  (cost=0.00..11.00 rows=100 width=262) (actual time=0.017..0.020 rows=30.00 loops=1)
+                          Buffers: shared hit=1
+        ->  Memoize  (cost=0.15..0.41 rows=1 width=262) (actual time=0.001..0.001 rows=1.00 loops=200)
+              Cache Key: t.driver_id
+              Cache Mode: logical
+              Hits: 187  Misses: 13  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+              Buffers: shared hit=26
+              ->  Index Scan using drivers_pkey on drivers d  (cost=0.14..0.40 rows=1 width=262) (actual time=0.003..0.003 rows=1.00 loops=13)
+                    Index Cond: (driver_id = t.driver_id)
+                    Index Searches: 13
+                    Buffers: shared hit=26
+Planning Time: 0.351 ms
+Execution Time: 6.872 ms
 ```
 
 ### 4. Why is it useful to understand the join algorithms?
 
-A query giving the right answer today doesn't mean it will stay quick when the platform gets bigger. The plan shows **how PostgreSQL gets that answer**, not just what comes back. It can help us spot unnecessary scans, lots of repeated lookups, an expensive sort, or a join that creates far more rows than expected. It also helps us decide whether an index or a query rewrite would actually help, instead of adding things just because they sound faster.
+Just because a query gives the right answer now doesn't mean it'll stay efficient as the platform grows. The plan tells us **how PostgreSQL is getting the answer**. Here, `EXPLAIN ANALYZE` also shows the difference between estimates and actual behavior: it expected 100 riders but scanned 30, and Memoize saved 187 repeated lookups. Those details help us decide where an index, different filter, or rewrite might actually make a difference instead of just guessing.
 
 ### 5. What changes might make a different algorithm more appropriate?
 
-More trips, different numbers of matching rows, or new indexes could all change the plan. If we added indexes on the trip table's driver and rider IDs, PostgreSQL might find indexed lookups more attractive for a smaller filtered report. For a very large report that joins most trips, scanning and hashing could still be cheaper than doing millions of separate lookups. A Merge Join could be worth considering if both inputs were available in useful order. Sorting by request time could also become more expensive as the trip table grows, especially if it no longer fits in memory. PostgreSQL chooses based on its cost estimates, so adding an index doesn't guarantee a specific join type.
+With many more trips, the sequential scan and final Sort could become more expensive. The Sort currently uses only **46kB**, but sorting millions of rows might need much more memory or spill to disk. More *distinct* drivers could also cut into Memoize's benefit: with 13 different driver IDs, it only needed 13 index searches, but with thousands of drivers it could have far more misses. If the rider table grew much larger, the Hash Join might need a bigger hash table, or PostgreSQL might prefer another approach.
+
+Adding indexes to trip foreign keys could help a report filtered to particular drivers or riders, though it wouldn't automatically improve this report, which includes every trip. A Merge Join could become attractive if both inputs were already sorted in a useful way. The point is to match the plan to the data size, how many rows match, and which indexes exist—not to assume one join type is always best.
 
 ### Reflection (150–250 words)
 
-Right now the three-table report is working with 200 trips, 30 riders, and 15 drivers. At that size, PostgreSQL can afford to scan a small table or do repeated lookups without much trouble. But I wouldn't assume the same approach would make sense after the platform grows to a million trips. The number of rows, how many matches each join finds, and the indexes available can all change which algorithm costs the least.
+The first EXPLAIN showed a Hash Join between trips and riders, followed by a Nested Loop to connect drivers. When I ran EXPLAIN ANALYZE, both joins actually returned 200 rows, so those estimates were right. But PostgreSQL estimated 100 riders when it really scanned 30, which reminded me that the plan is working from estimates, not perfect knowledge of the data.
 
-For example, the supplied trip table doesn't have separate indexes on its rider and driver foreign keys. Adding them could make indexed lookups more useful, especially if a report is narrowed down to a few drivers or riders. A Nested Loop might then be a good fit. If a report needs almost every trip, a Hash Join could still be faster because it can process large sets without doing an index lookup for every trip. A Merge Join might make sense when both sides are already sorted by the join key. The request-time sort could become another bottleneck as the output grows.
+What surprised me most was Memoize. The query needed 200 driver lookups, but 187 came from its cache and only 13 required index searches. That works well here because lots of trips refer to the same small group of drivers. If the platform grew to thousands of drivers and trips were spread more evenly across them, there might be fewer cache hits, and PostgreSQL could decide a different join would be cheaper.
 
-What matters is checking the actual execution plan rather than assuming that one algorithm is always best. I'd compare estimated rows and costs, and use EXPLAIN ANALYZE for a read-only query if I needed to see what really happened.
+The Sort was also tiny: 46kB for 200 results. With millions of trips, that could become a much bigger job, possibly needing disk space. New indexes on trip foreign keys might help reports filtered to a few riders or drivers, but probably wouldn't be a magic fix for a report that reads everything. Bigger tables, different matching patterns, and better indexes could all change which join algorithm PostgreSQL picks. That's why I'd check the plan again as the data changes instead of assuming today's quick run will stay quick.
