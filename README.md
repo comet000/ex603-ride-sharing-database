@@ -302,4 +302,4 @@ The reference dataset contains only **200 trip requests** and **12 rider no-show
 
 ## Video Presentation
 
-**Video link:** *[placeholder]*
+**Video presentation (4:06, narrated):** [Watch the EX603 Ride-Sharing SQL Presentation](https://drive.google.com/file/d/1jLHN-wgoC0kp6Em0rpmSXPtmCqN6eor-/view?usp=drive_link)
