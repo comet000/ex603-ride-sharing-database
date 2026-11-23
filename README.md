@@ -47,9 +47,9 @@ psql -d ridesharing -c "\dt"
 
 The script starts with a reset block, so you can run it again on the same database without cleaning anything up first.
 
-## Course query catalogue — Units 3 and 4
+## Course query catalogue — Units 3–6
 
-The schema and setup instructions above describe my **Unit 2 database**. For Units **3 and 4**, the course supplied a separate ride-sharing dataset, [`rideshare.sql`](rideshare.sql), used in the `ex603_data` PostgreSQL database. Its tables and fields are not necessarily the same as my Unit 2 design. For the course dataset, the failure being audited is **a rider no-show**, recorded as `cancellation_reason = 'Rider no show'`.
+The schema and setup instructions above describe my **Unit 2 database**. For Units **3–6**, the course supplied a separate ride-sharing dataset, [`rideshare.sql`](rideshare.sql), used in the `ex603_data` PostgreSQL database. Its tables and fields are not necessarily the same as my Unit 2 design. For the course dataset, the failure being audited is **a rider no-show**, recorded as `cancellation_reason = 'Rider no show'`.
 
 To load the course dataset into a new database, from the folder containing `rideshare.sql`:
 
@@ -59,7 +59,15 @@ psql -d ex603_data -f rideshare.sql
 psql -d ex603_data -c "SELECT COUNT(*) FROM trips;"
 ```
 
-The final check should return **200 trips**. The dataset script drops and recreates its tables on each run, so don't reload it into a database containing work you need to keep. The Unit 4 files contain read-only `SELECT` queries; run them against this course dataset, not the Unit 2 schema. Some Unit 3 files deliberately demonstrate a **broken** query before showing its repair, so those examples are not intended to execute successfully as a single uninterrupted script.
+The final check should return **200 trips**. The dataset script drops and recreates its tables on each run, so don't reload it into a database containing work you need to keep. The supplied `rideshare.sql` file should be kept unchanged; it creates the reference analytics schema and data, which are separate from my Unit 2 schema. The Unit 4–6 files contain read-only `SELECT` queries; run them against this course dataset, not the Unit 2 schema. Some Unit 3 files deliberately demonstrate a **broken** query before showing its repair, so those examples are not intended to execute successfully as a single uninterrupted script.
+
+To run a Unit 6 query file after loading `ex603_data`, use:
+
+```bash
+psql -d ex603_data -f queries/unit6/q6_3.sql
+```
+
+You can also run each `SELECT` separately in DataGrip. The SQL files contain multiple independent queries. Unit 6 uses native timestamps and dates and keeps percentage/fare calculations numeric, rounded to two decimal places.
 
 ### Unit 3 — Interrogating the Data
 
@@ -134,3 +142,94 @@ The Unit 3 leadership-facing audit is in [`analysis/unit3-finding.md`](analysis/
 | D2 — Exploratory | How do recorded no-show rates vary by surge multiplier? |
 
 For the expanded discussion of fare averages, the volume threshold, geographic and driver comparisons, additional rider and surge checks, and the reflection, see [`analysis/unit4.md`](analysis/unit4.md). The leadership report and recommended follow-up investigations are in [`analysis/unit4-finding.md`](analysis/unit4-finding.md). Query-and-result screenshots are in [`screenshots/`](screenshots/), named to match the query each one shows. The regional subtotal and grand-total rows are explicitly labeled in the Part B1 output.
+
+
+### Unit 5 — Connecting the Tables
+
+**[`queries/unit5/q5_1.sql`](queries/unit5/q5_1.sql) — Add people, badges, and peer comparisons**
+
+| Query | Business question |
+|---|---|
+| Part 1 — Required | Which rider and driver are associated with each trip? (Three-table join.) |
+| Part 2a/2b | Which badges do the previously flagged drivers hold, and what do those awards actually show? |
+| Part 3a/3b | How do drivers compare with peers from the same home city or with similar recorded trip counts? |
+
+**[`queries/unit5/q5_2.sql`](queries/unit5/q5_2.sql) — Find rows that joins can miss**
+
+| Query | Business question |
+|---|---|
+| Part A — Required | Which drivers disappear from an `INNER JOIN` because they have no trips? |
+| Part B | Do `LEFT JOIN`, `RIGHT JOIN`, and `FULL OUTER JOIN` tell the same story about missing records? |
+| Part C | Can `NOT EXISTS` and `EXCEPT` identify drivers without trips consistently? |
+
+**[`queries/unit5/q5_3.sql`](queries/unit5/q5_3.sql) — Understand join behavior and performance**
+
+| Query | Business question |
+|---|---|
+| CROSS JOIN examples | When is every possible driver/badge combination useful, and when would a Cartesian product be a mistake? |
+| Execution plan | Which join methods did PostgreSQL use for the three-table trip report, and why? |
+
+See the detailed discussion in [`analysis/unit5.md`](analysis/unit5.md) and the leadership conclusions in [`analysis/unit5-finding.md`](analysis/unit5-finding.md). These files preserve the earlier finding that **Drivers 14 and 15** have no recorded trips in the 2023 extract, despite being marked active.
+
+### Unit 6 — Analytics and Window Functions
+
+**[`queries/unit6/q6_1.sql`](queries/unit6/q6_1.sql) — Compare, rank, and form quartiles**
+
+| Query | Business question |
+|---|---|
+| 1a — Required | Which trips are far from their own driver's average fare without losing individual rows? |
+| 1b — Required | What disappears when the same comparison starts with `GROUP BY`? |
+| 2 — Required | How do `ROW_NUMBER()`, `RANK()`, and `DENSE_RANK()` differ when driver trip counts tie? |
+| 3 — Required | Where does `NTILE(4)` put equally active drivers at a quartile boundary? |
+
+**[`queries/unit6/q6_2.sql`](queries/unit6/q6_2.sql) — Compare neighbors and track progress**
+
+| Query | Business question |
+|---|---|
+| 1 / Part A — Required | How did Driver 2's recorded fare change from one trip to the next (`LAG`/`LEAD`)? |
+| 2a / Part B — Required | How did monthly request counts accumulate toward an illustrative target? |
+| 2b / Part B — Required | How did monthly recorded fares accumulate toward an illustrative target? |
+| 2c / Part B — Required | What does a three-month moving average show about trip volume? |
+| 2d / Part B — Required | What does the same moving window show about recorded fares, and how does `ROWS` differ from `RANGE`? |
+| 3 / Part C — Required | Which drivers have gaps of 60 or more full days between recorded trips? |
+
+**[`queries/unit6/q6_3.sql`](queries/unit6/q6_3.sql) — Build reporting patterns**
+
+| Query | Business question |
+|---|---|
+| 1 / Part A — Required | Which are each driver's three highest recorded fares, relative to that driver's maximum? |
+| 2a / Part B — Required | Is the monthly rider no-show rate getting better or worse, and are any calendar months missing? |
+| 2b — Supporting Task 6.4 | How did the rider no-show rate move quarter by quarter? |
+| 2c — Supporting Task 6.4 | What does a correctly weighted trailing three-month no-show rate show? |
+| 2d — Supporting Task 6.4 | Did the earlier flagged drivers show the same first-half/second-half trend as other drivers? |
+| Extra 1 — Supporting Task 6.4 | Which twelve actual trips should Driver Operations and Rider Support review? |
+
+The detailed answers and 150–250-word reflection are in [`analysis/unit6.md`](analysis/unit6.md); the final recommendations are in [`analysis/unit6-finding.md`](analysis/unit6-finding.md). Screenshot names can follow the earlier Unit 5 underscore convention, such as `6_1_1a`, `6_2_2c`, `6_3_2a`, and `6_3_extra1` for the optional review list.
+
+## Technical Highlights
+
+**Finding the dashboard's silent `NULL` bug (Unit 3).** A filter that appeared to exclude rider no-shows also silently excluded most trips with a NULL cancellation reason. Correcting the denominator gave the true **12 no-shows in 200 trips (6.00%)**, rather than the misleading dashboard rate. The deliberate broken queries remain in the Unit 3 files as examples, clearly labeled.
+
+**Conditional aggregation and regional reporting (Unit 4).** Counting all trips alongside `Rider no show` outcomes keeps zero-failure groups in the result. Driver summaries, regional `ROLLUP` subtotals, and a separate high-volume baseline helped distinguish observed rates from the very small histories that make some percentages misleading.
+
+**Joins and missing records (Unit 5).** An `INNER JOIN` starting from trip records shows only **13** of the **15** drivers. `LEFT JOIN`, `NOT EXISTS`, and `EXCEPT` explain why Drivers **14 and 15** are absent from event-based reports. `EXPLAIN` was used to inspect the actual join plan rather than guessing how PostgreSQL executed it.
+
+**Window functions and explicit window frames (Unit 6).** `AVG(...) OVER (PARTITION BY driver_id)` places each driver's average on all **200** trip rows. `LAG()`/`LEAD()` compare neighboring trips; `ROWS BETWEEN` frames build running totals and moving averages without losing the monthly sequence. A CTE computes ranks or gaps before an outer `WHERE` filters them, because window results cannot be filtered by `WHERE` in the same SELECT.
+
+**Reproducible ranking without pretending ties are resolved fairly (Unit 6).** We added `driver_id` only as a reproducible tie-breaker in `ROW_NUMBER()` and `NTILE(4)`. If omitted, tied drivers' unique positions or quartile assignments might switch on rerun. The limitation remains: equal trip counts can receive different row numbers or fall into different quartiles. `RANK()` and `DENSE_RANK()` deliberately use trip counts alone and preserve genuine ties. For neighboring trip comparisons, `trip_id` consistently breaks equal timestamps in `LAG()`/`LEAD()` so the fare and its delta refer to the same preceding or following row.
+
+## Findings and Recommendations
+
+**The rider no-show failure rate was initially overstated.** Across 2023, the corrected figure is **12 of 200 trip requests (6.00%)**. This does not justify an automatic fleet-wide payout freeze. Keep the failure definition, denominator, and NULL-handling checks explicit before using the rate for management decisions.
+
+**Drivers 2 and 3 deserve targeted investigation; Driver 4 needs more observations.** Driver 2 recorded **3 rider no-shows in 16 trips (18.75%)**, Driver 3 **2 in 13 (15.38%)**, and Driver 4 **1 in just 6 (16.67%)**. The apparent rates are not proof of driver fault. Unit 4 also found repeat no-shows involving Riders 1 and 21. Driver Operations and Rider Support should review the underlying pickup events together. Drivers 14 and 15, who had no recorded trips, need a separate account/dispatch check rather than an invented 0% performance rating.
+
+**There is some improvement across quarters, but monthly rates remain noisy.** The observed rider no-show rate declined from **7.55% in Q1** to **4.17% in Q4**, while **December rebounded to 12.50%** after October and November were at zero. The twelve-event numerator is too small to claim a lasting trend. Keep counts beside rates, check for missing months, use a weighted rolling rate for context, and review the individual trips rather than making a decision from a one-month spike. See [`analysis/unit6-finding.md`](analysis/unit6-finding.md).
+
+## Limitations and Future Improvements
+
+The reference dataset contains only **200 trip requests** and **12 rider no-shows** over one year. A change of one or two events can move a monthly percentage sharply, and no rate here establishes that a driver caused a no-show. The `trips` table also lacks driver online time, confirmed pickup arrivals, wait durations, support communications, and actual payment/refund records. Without those, we cannot determine whether long activity gaps reflect real absence, low demand, or missing records—or calculate actual revenue lost to cancelled trips. Additional historical trips and pickup/availability/payment telemetry would make next-quarter decisions more reliable.
+
+## Video Presentation
+
+**Video link:** *[placeholder]*
