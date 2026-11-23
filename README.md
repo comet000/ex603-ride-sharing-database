@@ -1,6 +1,6 @@
 # Ride Sharing Database
 
-A PostgreSQL database for storing and analyzing ride-sharing data: riders, drivers, trips, and the badges drivers earn.
+A PostgreSQL ride-sharing project combining a custom database design (Units 1–2) with SQL analysis of a separate course-provided dataset (Units 3–6), focused on rider no-shows.
 
 **Theme:** Ride Sharing
 
@@ -10,7 +10,11 @@ This database covers the basics of a ride-sharing platform: riders, drivers, tri
 
 The whole point is to make the data easy to ask questions of. For example: how many trips has a driver completed, how much do their fares add up to, which riders actually take trips, who's active right now, how long do trips take, and which badges has a driver earned. The schema is built so those queries stay simple and don't need any hoops.
 
-## Schema
+For Units 3–6, I used a separate ride-sharing dataset supplied by the course. The central question became whether rider no-shows were improving or getting worse, which drivers or riders warranted closer review, and what the team should do next. I started by checking an incorrectly calculated failure rate, then used grouped summaries, joins, and window functions to compare activity across drivers and over time. The two schemas are related by theme, but they are not interchangeable.
+
+## Unit 2: Custom schema
+
+The ERD below shows the database I designed for Unit 2. Units 3–6 use the separate reference schema described later.
 
 ![ERD](schema/erd.png)
 
@@ -37,6 +41,8 @@ The reasoning behind all of this is in [`analysis/unit2.md`](analysis/unit2.md).
 
 ## How to run it
 
+### Unit 2: Custom schema
+
 You need PostgreSQL 14 or later and an empty database.
 
 ```bash
@@ -47,7 +53,7 @@ psql -d ridesharing -c "\dt"
 
 The script starts with a reset block, so you can run it again on the same database without cleaning anything up first.
 
-## Course query catalogue — Units 3–6
+### Units 3–6: Course dataset
 
 The schema and setup instructions above describe my **Unit 2 database**. For Units **3–6**, the course supplied a separate ride-sharing dataset, [`rideshare.sql`](rideshare.sql), used in the `ex603_data` PostgreSQL database. Its tables and fields are not necessarily the same as my Unit 2 design. For the course dataset, the failure being audited is **a rider no-show**, recorded as `cancellation_reason = 'Rider no show'`.
 
@@ -68,6 +74,70 @@ psql -d ex603_data -f queries/unit6/q6_3.sql
 ```
 
 You can also run each `SELECT` separately in DataGrip. The SQL files contain multiple independent queries. Unit 6 uses native timestamps and dates and keeps percentage/fare calculations numeric, rounded to two decimal places.
+
+## Units 3–6: Reference database overview
+
+The Unit 3–6 DDL and sample records are in the course-provided [`rideshare.sql`](rideshare.sql), separate from my custom [`schema/schema.sql`](schema/schema.sql). The reference database contains **30 riders, 15 drivers, and 200 trip requests from 2023**, along with driver languages and badges. Its `trips` table records request and completion times, pickup city, fare, distance, surge multiplier, trip status, and cancellation reason. These are the fields used for the failure-rate investigation and later trend analyses.
+
+| Table | Role in the reference dataset | Fields relevant to the analysis |
+|---|---|---|
+| `riders` | Rider accounts and referrals | `rider_id`, `home_city`, `referred_by`, `is_active` |
+| `drivers` | Driver accounts | `driver_id`, `home_city`, `avg_rating`, `is_active` |
+| `trips` | Trip requests and outcomes | `rider_id`, `driver_id`, `requested_at`, `fare_amount`, `trip_status`, `cancellation_reason` |
+| `driver_languages` | Languages associated with drivers | `driver_id`, `language_code` |
+| `driver_badges` | Badge catalogue | `badge_id`, `badge_name` |
+| `driver_badge_awards` | Badges awarded to drivers | `driver_id`, `badge_id`, `awarded_on` |
+
+The ERD below summarizes the relationships in the supplied reference schema. `trips` links riders to drivers, `driver_languages` allows a driver to have multiple languages, and `driver_badge_awards` connects drivers with badges. Riders may also refer other riders.
+
+```mermaid
+erDiagram
+    RIDERS ||--o{ TRIPS : requests
+    DRIVERS ||--o{ TRIPS : receives
+    DRIVERS ||--o{ DRIVER_LANGUAGES : speaks
+    DRIVERS ||--o{ DRIVER_BADGE_AWARDS : earns
+    DRIVER_BADGES ||--o{ DRIVER_BADGE_AWARDS : includes
+    RIDERS o|--o{ RIDERS : refers
+
+    RIDERS {
+        int rider_id PK
+        varchar home_city
+        int referred_by FK
+        boolean is_active
+    }
+    DRIVERS {
+        int driver_id PK
+        varchar home_city
+        decimal avg_rating
+        boolean is_active
+    }
+    TRIPS {
+        bigint trip_id PK
+        int rider_id FK
+        int driver_id FK
+        timestamp requested_at
+        decimal fare_amount
+        varchar trip_status
+        varchar cancellation_reason
+    }
+    DRIVER_LANGUAGES {
+        int driver_id FK
+        char language_code
+    }
+    DRIVER_BADGES {
+        int badge_id PK
+        varchar badge_name
+    }
+    DRIVER_BADGE_AWARDS {
+        int driver_id FK
+        int badge_id FK
+        date awarded_on
+    }
+```
+
+The detailed table definitions, keys, and constraints are in [`rideshare.sql`](rideshare.sql). Unlike the Unit 2 design, the reference schema records cancellation reasons and surge multipliers, which are central to the later assignments. The failure metric throughout Units 3–6 is **rider no-shows divided by all trip requests**, not just completed or cancelled trips.
+
+## Course query catalogue — Units 3–6
 
 ### Unit 3 — Interrogating the Data
 
